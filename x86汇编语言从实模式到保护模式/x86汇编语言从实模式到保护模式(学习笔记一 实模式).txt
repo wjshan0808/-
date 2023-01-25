@@ -216,92 +216,90 @@
     解释: (AX) = (AX) - (BX) - (CF)
 
 第八章 硬盘和显卡的访问与控制
-  0.NASM编译器使用汇编指令'SECTION'或者'SEGMENT'来定义段, 'ALIGN='来指定段的汇编地址对齐方式
+  0.NASM编译器使用汇编指令'SECTION'或者'SEGMENT'来定义段, 'ALIGN='来指定段的汇编地址对齐方式(影响下一段的起始汇编地址)
      格式: [section 段名称 align=对齐方式]
   1.若整个程序都没有段的定义, 则整个程序自成一个段
   2.NASM编译器提供'section.<段名称>.start'表达式来获取某段的起始汇编地址(相对于整个程序的开头)
-  3.段内标号的汇编地址计算
+  3.段内标号处的汇编地址计算
     a.当段定义语句中有包含'VSTART='子句时, 从它所在段的开头, 且指定的虚拟地址(vstart值)开始计算
     b.当段定义语句中不包含'VSTART='子句时, 从整个程序的开头开始计算
   4.伪指令equ声明常数
     例子: const_name equ 100
-  5.指令in从端口读数据(用al或ax来存放读取或写入端口的数据)
-    格式: in al/ax, dx
+  5.in指令从端口读数据
+    格式: in 寄存器, 寄存器/8位立即数
     例子: in al, 20H
-  6.指令out向端口写数据(对256~65535端口进行读写时用dx存放端口号)
-    格式: out dx, al/ax
-    例子: out 20H, al/ax
+    解释: 访问8位端口目的操作数需是AL, 访问16位端口目的操作数需是AX, 原操作数需是DX寄存器
+  6.out指令向端口写数据
+    格式: out 寄存器/8位立即数, 寄存器
+    例子: out dx, ax
+    解释: 访问8位端口原操作数需是AL, 访问16位端口原操作数需是AX, 目的操作数需是DX寄存器
   7.计算机中的PATA/SATA接口分主和副硬盘接口
     a.主硬盘接口端口号[0x01F0 ~ 0x01F7]
     b.副硬盘接口端口号[0x0170 ~ 0x0177]
-  8.采用LBA28访问硬盘(最大管理128GB的硬盘)
-    a.设置读写扇区数量(每成功读取一个扇区数量值减一)
-        mov al, 01H         ;扇区数量(若为0值, 则表示256个扇区)
-        mov dx, 01F2H       ;0x01F2端口
-        out dx, al
+  8.采用LBA28访问最大128GB的硬盘
+    a.设置读写扇区数量(每成功读写一个扇区数量值减一)
+        mov al, 01H         ;扇区数量(若为0值, 则表示读写256个扇区)
+        mov dx, 01F2H       ;写入0x01F2端口
+        out dx, al          ;
     b.设置读写起始LBA扇区号(4字节28位有效扇区号, 依次写入0x01F3~6端口)
         mov al, 00H         ;扇区号[00 ~ 07]位
-        mov dx, 01F3H       ;0x01F3端口
+        mov dx, 01F3H       ;写入0x01F3端口
         out dx, al          ;
         xor al, al          ;扇区号[08 ~ 15]位
-        inc dx              ;0x01F4端口
+        inc dx              ;写入0x01F4端口
         out dx, al          ;
         xor al, al          ;扇区号[16 ~ 23]位
-        inc dx              ;0x01F5端口
+        inc dx              ;写入0x01F5端口
         out dx, al          ;
         xor al, al          ;扇区号[24 ~ 27]位
-        or al, A0H          ;置高4位(B5:B7:01H)
-        or al, 00H          ;设置主(B4:00H), 从(B4:10H)硬盘
-        or al, 40H          ;设置CHS(B6:00H), LBA(B6:40H)模式
-        inc dx              ;0x01F6端口
+        or al, A0H          ;置Bit位(B5,B7:01H)
+        or al, 00H          ;设置主(B4:00H), 从(B4:01H)硬盘
+        or al, 40H          ;设置CHS(B6:00H), LBA(B6:01H)模式
+        inc dx              ;写入0x01F6端口
         out dx, al          ;
     c.设置读写数据请求
         mov al, 20H         ;读数据(20H), 写数据(30H)
-        mov dx, 01F7H       ;0x01F7端口
+        mov dx, 01F7H       ;写入0x01F7端口
         out dx, al
     d.循环获取读写状态
-        mov dx, 01F7H       ;0x01F7端口
+        mov dx, 01F7H       ;读取0x01F7端口
         sStatus:
             in al, dx
             and al, 01H     ;状态(B0:01H)有错误
-            and al, 08H     ;状态(B3:08H)已准备
-            and al, 80H     ;状态(B7:80H)工作中
+            and al, 08H     ;状态(B3:01H)已准备
+            and al, 80H     ;状态(B7:01H)工作中
             jmp near sStatus
     e.连续读取数据
-        mov dx, 01F0H       ;0x01F0端口
+        mov dx, 01F0H       ;读取0x01F0端口
         sRead:
             in ax, dx
             jmp near sRead
     f.获取错误原因
-        mov dx, 01F1H       ;0x01F1端口
+        mov dx, 01F1H       ;读取0x01F1端口
         in ax, dx
   9.转移指令call(将ip/cs:ip入栈, 然后转移)
-    a.段内转移(= 标号处的地址 - call指令后的第一个字节的地址)(匹配ret)
-      格式: call near 标号
+    a.段内偏移量机器指令操作数(= 目标汇编地址 - 当前call指令的汇编地址 - 当前call指令的0x03字节长度)(匹配ret)
+      格式: call near 目标汇编地址
       功能: a. push ip
-            b. jmp near 标号
-    b.段间转移((CS) = 标号所在段的段地址, (IP) = 标号所在段的偏移地址)(匹配retf)
+            b. (IP) = (IP) + 段内偏移量机器指令操作数 + 当前call指令的0x03字节长度
+      格式: call 寄存器/内存单元
+      功能: a. push ip
+            b. (IP) = 寄存器/内存单元值
+    b.段间转移(匹配retf)
       格式: call 段地址:偏移地址
       功能: a. push cs
             b. push ip
-            c. jmp 段地址:偏移地址
-    c.段内转移(寄存器的值, 是转移的目的偏移地址)(匹配ret)
-      格式: call 寄存器(16位)
-      功能: a. push ip
-            b. jmp 寄存器(16位)
-    d.段内转移(内存单元地址处一个字的值, 是转移的目的偏移地址)(匹配ret)
-      格式: call 内存单元地址
-      功能: a. push ip
-            b. jmp 内存单元地址处一个字
-    e.段间转移((IP) = 低地址处的一个字的值, (CS) = 高地址处的一个字的值)(匹配retf)
-      格式: call far 内存单元地址
+            c. (CS) = 段地址值
+            d. (IP) = 偏移地址值
+      格式: call far 内存单元地址(偏移地址在低地址处, 段地址在高地址处)
       功能: a. push cs
             b. push ip
-            c. jmp far 内存单元地址处两个字        
-  10.近转移指令ret(用栈中的数据修改ip)
+            c. (IP) = 低地址处的一个字的值
+            d. (CS) = 高地址处的一个字的值
+  10.近返回指令ret
     格式: ret
     功能: pop ip
-  11.远转移指令retf(用栈中的数据修改cs和ip)
+  11.远返回指令retf
     格式: retf
     功能: a. pop ip
           b. pop cs
