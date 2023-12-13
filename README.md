@@ -11,7 +11,7 @@
 
 [^0]. `Windows 命令`  
     
-[^1]: x  
+[^0]: x  
 ***  
 > [!TIP]
 > **密码**: [用户名](https://github.com/wjshan0808)   
