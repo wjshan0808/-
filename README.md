@@ -9,9 +9,9 @@
     
 ## 扩展列表
 
-0. `Windows 命令[^1]`  [^1]:  
+0. `Windows 命令[^1]`  
     
-
+[^1]: x  
 ***  
 > [!TIP]
 > **密码**: [用户名](https://github.com/wjshan0808)   
